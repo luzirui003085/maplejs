@@ -16,8 +16,8 @@ const server = net.createServer(c => {
   console.log(c.address())
   console.log('Connected, sending Hello')
   // Send handshake
-  c.receiveSequence = [70, 114, 122, 82;
-  c.sendSequence = [70, 114, 122, 82)
+  c.receiveSequence = [70, 114, 122, 82]
+  c.sendSequence = [70, 114, 122, 82]
   c.write(getHello(MAPLE_VERSION, c.sendSequence, c.receiveSequence))
   c.nextBlockLength = 4
   c.header = true;
