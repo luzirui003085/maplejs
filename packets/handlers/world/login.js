@@ -13,12 +13,11 @@ function login(client, reader) {
   mongoose.model('Account').findOne({
     username
   }).then(account => {
-    console.log(account)
     if (!!account) {
       if (account.password === password) {
         return Promise.resolve(account)
       } else {
-        return Promise.reject({message: 'Wrong password'})
+        return Promise.resolve(null)
       }
     } else {
       if (AUTO_REGISTER === true) {
@@ -29,27 +28,19 @@ function login(client, reader) {
       }
     }
   }).then(account => {
-    console.log('Oh yeah')
-    client.account = account
-    packet.writeShort(0)
-    packet.writeInt(0)
-    packet.writeInt(account.getIntID())
-    packet.write(0) // admin flag
-    packet.write(0)
-    packet.write(0)
-    packet.writeString(account.username)
-    packet.write(0)
-    packet.write(0)
-    packet.writeDate(new Date())
-    packet.writeDate(new Date())
-    packet.writeInt(0)
-    packet.write(true)
-    packet.write(1)
-    client.send(packet)
+    if (account === null) {
+      packet.writeInt(4)
+      packet.writeShort(0)
+      client.sendPacket(packet)
+    } else {
+      client.account = account
+      packet.writeArray([0, 0, 0, 0, 0, 0, 0xFF, 0x6A, 1, 0, 0, 0, 0x4E])
+      packet.writeString(account.username)
+      packet.writeArray([3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xDC, 0x3D, 0x0B, 0x28, 0x64, 0xC5, 1, 8, 0, 0, 0])
+      client.sendPacket(packet)
+    }
   }).catch(err => {
-    packet.writeInt(4)
-    packet.writeShort(0)
-    client.send(packet)
+    console.log(err, err.stack)
   })
 }
 

@@ -48,7 +48,6 @@ describe('Model testing', () => {
   })
 
   it('Should hack', done => {
-    console.log(packetProcessor)
     done()
   })
 

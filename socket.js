@@ -120,6 +120,16 @@ var sequenceShiftingKey = new Uint8Array([
   0x84, 0x7F, 0x61, 0x1E, 0xCF, 0xC5, 0xD1, 0x56, 0x3D, 0xCA, 0xF4, 0x05, 0xC6, 0xE5, 0x08, 0x49
 ]);
 
+export function encryptPacket(packet, sendSequence, version) {
+  let buffer = packet.getBufferCopy()
+  let header = generateHeader(sendSequence, packet.count, version)
+  encryptData(buffer, sendSequence)
+  let ret = new Buffer(buffer.length + 4)
+  header.copy(ret, 0, 0)
+  buffer.copy(ret, 4, 0)
+  return ret
+}
+
 export function morphSequence(currentSequence) {
   var newSequence = new Uint8Array([0xF2, 0x53, 0x50, 0xC6]);
 

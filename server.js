@@ -1,8 +1,6 @@
 import { initializeDatabase, MAPLE_VERSION } from './config'
 import net from 'net'
-import crypto from 'crypto'
-import { getHello } from './packets/common'
-import { getLengthFromHeader, decryptData, morphSequence, generateHeader, encryptData } from './socket'
+import { morphSequence, encryptPacket, getLengthFromHeader, decryptData } from './socket'
 import PacketReader from './packets/reader'
 import PacketBuilder from './packets/builder'
 
@@ -12,96 +10,86 @@ initializeDatabase()
 
 let connectedClients = []
 
-const server = net.createServer(c => {
-  console.log(c.address())
+const server = net.createServer(socket => {
   console.log('Connected, sending Hello')
   // Send handshake
-  c.receiveSequence = [70, 114, 122, 82]
-  c.sendSequence = [70, 114, 122, 82]
-  c.write(getHello(MAPLE_VERSION, c.sendSequence, c.receiveSequence))
-  c.nextBlockLength = 4
-  c.header = true;
-  c.ponged = true;
-  c.buffer = new Buffer(0)
+  socket.sendSequence = [82, 48, 120, 115]
+  socket.receiveSequence = [82, 48, 120, 115]
+  connectedClients.push(socket)
 
-  c.client = {}
-  connectedClients.push(c)
+  socket.header = true
+  socket.nextBlockLength = 4
+  socket.buffer = new Buffer(0)
 
-  c.send = packet => {
-    let buffer = packet.getBufferCopy()
-    let ret = new Buffer(buffer.length + 4)
-    let header = generateHeader(c.sendSequence, buffer.length, MAPLE_VERSION)
-    encryptData(buffer, c.sendSequence)
-    c.sendSequence = morphSequence(c.sendSequence)
-    header.copy(ret, 0, 0)
-    buffer.copy(ret, 4, 0)
-    console.log(ret)
-    c.write(ret)
+  var packet = new PacketBuilder()
+  packet.writeShort(0x0d)
+  packet.writeShort(MAPLE_VERSION)
+  packet.writeShort(0)
+  packet.writeArray(socket.receiveSequence)
+  packet.writeArray(socket.sendSequence)
+  packet.write(8)
+  socket.write(packet.getBufferCopy())
+
+  socket.sendPacket = packet => {
+    let data = encryptPacket(packet, socket.sendSequence,  -15873)
+    socket.sendSequence = morphSequence(socket.sendSequence)
+    socket.write(data)
   }
 
-  c.on('end', () => {
-    connectedClients.pop(c)
-    console.log('Ended')
-  })
-
-  c.on('data', data => {
-    c.send(new PacketBuilder(data))
-    console.log('Received', data)
-    const temp = c.buffer
-    c.buffer = Buffer.concat([temp, data])
-
-    while (c.nextBlockLength <= c.buffer.length) {
-      let readingBlock = c.nextBlockLength
-      let data = c.buffer
-      let block = new Buffer(c.nextBlockLength)
+  socket.on('data', receivedData => {
+    socket.pause()
+    let temp = socket.buffer
+    socket.buffer = Buffer.concat([temp, receivedData])
+    while (socket.nextBlockLength <= socket.buffer.length) {
+      let readingBlock = socket.nextBlockLength
+      let data = socket.buffer
+      let block = new Buffer(socket.nextBlockLength)
       data.copy(block, 0, 0, block.length)
-      c.buffer = new Buffer(data.length - block.length)
-      data.copy(c.buffer, 0, block.length)
-
-      if (c.header) {
-        c.nextBlockLength = getLengthFromHeader(block)
+      socket.buffer = new Buffer(data.length - block.length)
+      data.copy(socket.buffer, 0, block.length);
+      if (socket.header) {
+        socket.nextBlockLength = getLengthFromHeader(block)
       } else {
-        c.nextBlockLength = 4
-        decryptData(block, c.receiveSequence)
-        c.receiveSequence = morphSequence(c.receiveSequence)
-        const reader = new PacketReader(block)
-        let handler = server.packetProcessor[reader.opCode]
+        socket.nextBlockLength = 4
+        decryptData(block, socket.receiveSequence)
+        socket.receiveSequence = morphSequence(socket.receiveSequence)
+        let reader = new PacketReader(block)
+        let handler = server.packetHandler[reader.opCode]
         if (!!handler) {
-          handler(c, reader)
+          try {
+            handler(socket, reader)
+          } catch(ex) {
+            console.error(ex, ex.stack)
+          }
         } else {
-          console.log('Could not find handler for opcode', reader.opCode)
+          console.log('Could not handle opcode', reader.opCode)
         }
       }
-      c.header = !c.header
+      socket.header = !socket.header
     }
+    socket.resume()
   })
-}).on('error', err => {
-  console.log('whaat')
-  throw err
 })
 
-server.packetProcessor = require('./packets/processors/world')
-server.packetProcessor[0x18] = function(client, reader) {
-  console.log('Received pong')
-  client.ponged = true
-}
 server.startPinger = function() {
-  let shit = setInterval(() => {
-    let packet = new PacketBuilder(0x11);
-    for (let client of connectedClients) {
+  var shit = setInterval(() => {
+    var packet = new PacketBuilder(0x0011);
+    for (var i=0; i < connectedClients.length; i++) {
       try {
-        console.log('Sending ping')
-        client.send(packet)
+        connectedClients[i].sendPacket(packet)
       } catch (ex) {
         console.log(ex)
       }
     }
-  }, 20000)
+  }, 15000)
 }
 
-server.listen({
-  port: 8484
-}, () => {
-  console.log('Listening')
-  server.startPinger()
+server.packetHandler = require('./packets/processors/world')
+server.packetHandler[0x0018] = ((client, reader) => {
+  client.ponged = true
 })
+
+server.listen(8484)
+server.startPinger()
+
+

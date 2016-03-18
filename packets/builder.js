@@ -1,6 +1,6 @@
 export default class PacketBuilder {
   constructor(opCode) {
-    this.buffer = new Buffer(32)
+    this.buffer = new Buffer(128)
     this.count = 0
     this.writeShort = this.writeShort.bind(this)
     this.write = this.write.bind(this)
