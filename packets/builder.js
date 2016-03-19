@@ -1,10 +1,12 @@
 export default class PacketBuilder {
   constructor(opCode) {
-    this.buffer = new Buffer(128)
+    this.buffer = new Buffer(256)
     this.count = 0
-    this.writeShort = this.writeShort.bind(this)
     this.write = this.write.bind(this)
+    this.writeShort = this.writeShort.bind(this)
     this.writeArray = this.writeArray.bind(this)
+    this.writeInt = this.writeInt.bind(this)
+    this.writeLong = this.writeLong.bind(this)
 
     if (opCode !== undefined) {
       this.writeShort(opCode)
@@ -24,6 +26,17 @@ export default class PacketBuilder {
   write(val) {
     this.buffer.writeUInt8(val, this.count)
     this.count += 1
+  }
+
+  writeLong(val) {
+    this.write(val & 0xFF)
+    this.write((val >>> 8) & 0xFF)
+    this.write((val >>> 16) & 0xFF)
+    this.write((val >>> 24) & 0xFF)
+    this.write((val >>> 32) & 0xFF)
+    this.write((val >>> 40) & 0xFF)
+    this.write((val >>> 48) & 0xFF)
+    this.write((val >>> 56) & 0xFF)
   }
 
   writeArray(arr) {

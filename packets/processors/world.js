@@ -2,13 +2,15 @@ import fs from 'fs'
 import path from 'path'
 const packetProcessor = {}
 
-fs.readdir(path.join(__dirname, '../handlers/world'), (err, files) => {
-  if (!err) {
-    files.forEach(file => {
-      require('../handlers/world/' + file)(packetProcessor)
-    })
-    console.log('Loaded world packet processor')
-  }
+const IGNORE_CODES = [0x1A]
+
+let files = fs.readdirSync(path.join(__dirname, '../handlers/world'))
+files.forEach(file => {
+  require('../handlers/world/' + file)(packetProcessor)
 })
+
+for (let code of IGNORE_CODES) {
+  packetProcessor[code] = function(){}
+}
 
 module.exports = packetProcessor

@@ -10,6 +10,8 @@ describe('Model testing', () => {
     mongoose.model('Account')
       .findOne({username: 'martin'})
       .then(account => account.remove())
+      .then(() =>  mongoose.model('Character').findOne({name: 'martin'}))
+      .then(char => char.remove())
       .then(() => mongoose.disconnect())
       .then(done)
       .catch(done)
@@ -37,6 +39,32 @@ describe('Model testing', () => {
     }).catch(done)
   })
 
+  it('Should find account and create character', done => {
+    mongoose.model('Account').findOne({
+      username: 'martin'
+    }).then(account => {
+      expect(account._id).to.be.ok
+      return mongoose.model('Character')
+        .create({
+          name: 'martin',
+          account: account
+        })
+    }).then(character => {
+      expect(character).to.be.ok
+      done()
+    }).catch(done)
+  })
+
+  it('Should find character and populate account', done => {
+    mongoose.model('Character')
+      .findOne({name: 'martin'})
+      .populate('account')
+      .then(char => {
+        expect(char.account.username).to.equal('martin')
+        done()
+      }).catch(done)
+  })
+
   it('Should fail on finding a account', done => {
     mongoose.model('Account').findOne({
       username: 'martin',
@@ -47,8 +75,18 @@ describe('Model testing', () => {
     }).catch(done)
   })
 
-  it('Should hack', done => {
-    done()
+  it('Should lookup on intid', done => {
+    let charId
+    mongoose.model('Character').findOne({
+      name: 'martin'
+    }).then(char => {
+      charId = char._id.toString()
+      return mongoose.model('Character').getFromIntID(char.getIntID())
+    }).then(char => {
+      expect(char._id.toString()).to.equal(charId)
+      done()
+    }).catch(done)
   })
+
 
 })
