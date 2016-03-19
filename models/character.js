@@ -53,7 +53,10 @@ let characterSchema = Schema({
   face: Number,
   ap: Number,
   sp: Number,
-  map: Number,
+  map: {
+    type: Number,
+    default: 100000000
+  },
   spawnPoint: Number,
   gm: Number,
   party: Number,
