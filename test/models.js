@@ -4,7 +4,9 @@ import { initializeDatabase } from '../config'
 import packetProcessor from '../packets/processors/world'
 
 describe('Model testing', () => {
-  before(initializeDatabase)
+  before(done => {
+    initializeDatabase(process.env.TEST_DATABASE_URL).then(done).catch(done)
+  })
 
   after(done => {
     mongoose.model('Account')
@@ -80,13 +82,11 @@ describe('Model testing', () => {
     mongoose.model('Character').findOne({
       name: 'martin'
     }).then(char => {
-      charId = char._id.toString()
       return mongoose.model('Character').getFromIntID(char.getIntID())
     }).then(char => {
-      expect(char._id.toString()).to.equal(charId)
+      console.log(char.getIntID())
       done()
     }).catch(done)
   })
-
 
 })

@@ -1,5 +1,8 @@
 import mongoose, { Schema } from 'mongoose'
 
+let itemSchema = Schema({
+})
+
 let characterSchema = Schema({
   world: Number,
   account: {

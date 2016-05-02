@@ -1,14 +1,22 @@
 import PacketBuilder from '../../builder'
 import mongoose from 'mongoose'
-import { addCharStats } from '../helpers'
+import { addCharStats, addCharacterToMap } from '../helpers'
+import { enterMap } from '../../../store/actions/maps'
 
 module.exports = function packet(packetprocessor) {
-  packetprocessor[0x14] = function(client, reader) {
+  packetprocessor[0x14] = function(client, reader, dispatch) {
     let charId = reader.readInt()
     mongoose.model('Character').getFromIntID(charId)
       .then(char => {
+        client.character = char
+        client.character.location = {
+          xpos: 0,
+          ypos: 0,
+          stance: 0,
+          foothold: 0
+        }
         let packet = new PacketBuilder(0x5C)
-        packet.writeInt(0) // Channel - need to get this from somewhere
+        packet.writeInt(client.server.channel - 1)
         packet.write(1)
         packet.write(1)
         packet.writeShort(0)
@@ -43,14 +51,19 @@ module.exports = function packet(packetprocessor) {
         // End rocks
         packet.writeInt(0)
         packet.writeLong(0)
-        client.sendPacket(packet)
-        packet = new PacketBuilder(0x107)
-        packet.write(0)
-        for (let i=0; i<90; i++) {
-          packet.write(0)
-          packet.writeInt(0)
-        }
-        client.sendPacket(packet)
+        return client.sendPacket(packet)
+      }).then(() => dispatch(enterMap(client)))
+      .then(() => {
+        addCharacterToMap(client)
+        // let packet = new PacketBuilder(0x107)
+        // packet.write(0)
+        // for (let i=0; i<90; i++) {
+        //   packet.write(0)
+        //   packet.writeInt(0)
+        // }
+        // client.sendPacket(packet)
+      }).catch(err => {
+        console.log('Error in shit', err, err.stack)
       })
   }
 }

@@ -1,2 +1,6 @@
 import './account'
 import './character'
+import './mapPortal'
+import './map'
+import './npc'
+import './monster'

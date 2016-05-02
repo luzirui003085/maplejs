@@ -1,6 +1,6 @@
 export default class PacketBuilder {
   constructor(opCode) {
-    this.buffer = new Buffer(256)
+    this.buffer = new Buffer(512)
     this.count = 0
     this.write = this.write.bind(this)
     this.writeShort = this.writeShort.bind(this)
@@ -14,13 +14,15 @@ export default class PacketBuilder {
   }
 
   writeShort(val) {
-    this.buffer.writeUInt16LE(val, this.count)
-    this.count += 2
+    this.write(val & 0xFF)
+    this.write((val >>> 8) & 0xFF)
   }
 
   writeInt(val) {
-    this.buffer.writeUInt32LE(val, this.count)
-    this.count += 4
+    this.write(val & 0xFF)
+    this.write((val >>> 8) & 0xFF)
+    this.write((val >>> 16) & 0xFF)
+    this.write((val >>> 24) & 0xFF)
   }
 
   write(val) {

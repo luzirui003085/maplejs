@@ -1,3 +1,7 @@
+import store from '../../store'
+import PacketBuilder from '../builder'
+import mongoose from 'mongoose'
+
 export function addCharEntry(packet, char) {
   addCharStats(packet, char)
   addCharLook(packet, char)
@@ -45,4 +49,242 @@ function addCharLook(packet, char) {
   packet.writeInt(0) // No cash weapon
   packet.writeInt(0)
   packet.writeLong(0)
+}
+
+export function parseMovement(packet) {
+  let movements = []
+  let numCommands = packet.readByte()
+  for (let i = 0; i < numCommands; i++) {
+    let command = packet.readByte()
+    let movement = {
+      type: command,
+      xpos: 0,
+      ypos: 0,
+      xwobble: 0,
+      ywobble: 0,
+      flushDelay: 0,
+      stance: 0,
+      foothold: 0,
+      unknown1: 0,
+      unknown2: 0
+    }
+    switch(command) {
+      case 0: // Normal move
+      case 5:
+      case 17:
+        movement.xpos = packet.readShort()
+        movement.ypos = packet.readShort()
+        movement.xwobble = packet.readShort()
+        movement.ywobble = packet.readShort()
+        movement.flushDelay = packet.readShort()
+        movement.stance = packet.readByte()
+        movement.foothold = packet.readShort()
+        break
+      case 1:
+      case 2:
+      case 6:
+      case 12:
+      case 13:
+      case 16:
+        movement.xpos = packet.readShort()
+        movement.ypos = packet.readShort()
+        movement.stance = packet.readByte()
+        movement.foothold = packet.readShort()
+        break
+      case 3:
+      case 4:
+      case 7:
+      case 8:
+      case 9:
+      case 14:
+        movement.xpos = packet.readShort()
+        movement.ypos = packet.readShort()
+        movement.xwobble = packet.readShort()
+        movement.ywobble = packet.readShort()
+        movement.stance = packet.readByte()
+        break
+      case 10:
+        movement.unknown1 = packet.readByte() // equip?
+        break
+      case 11:
+        movement.xpos = packet.readShort()
+        movement.ypos = packet.readShort()
+        movement.flushDelay = packet.readShort()
+        movement.stance = packet.readByte()
+        movement.foothold = packet.readShort()
+        break
+      case 15:
+        movement.xpos = packet.readShort()
+        movement.ypos = packet.readShort()
+        movement.xwobble = packet.readShort()
+        movement.ywobble = packet.readShort()
+        movement.flushDelay = packet.readShort()
+        movement.unknown2 = packet.readShort()
+        movement.stance = packet.readByte()
+        movement.foothold = packet.readShort()
+        break
+      default:
+        console.log('Could not parse command', packet)
+    }
+    movements.push(movement)
+  }
+  return movements
+}
+
+export function encodeMovements(packet, movements) {
+  packet.write(movements.length)
+  for (let movement of movements) {
+    packet.write(movement.type)
+    switch(movement.type) {
+      case 0: // Normal move
+      case 5:
+      case 17:
+        packet.writeShort(movement.xpos)
+        packet.writeShort(movement.ypos)
+        packet.writeShort(movement.xwobble)
+        packet.writeShort(movement.ywobble)
+        packet.writeShort(movement.flushDelay)
+        packet.write(movement.stance)
+        packet.writeShort(movement.foothold)
+        break
+      case 1:
+      case 2:
+      case 6:
+      case 12:
+      case 13:
+      case 16:
+        packet.writeShort(movement.xpos)
+        packet.writeShort(movement.ypos)
+        packet.write(movement.stance)
+        packet.writeShort(movement.foothold)
+        break
+      case 3:
+      case 4:
+      case 7:
+      case 8:
+      case 9:
+      case 14:
+        packet.writeShort(movement.xpos)
+        packet.writeShort(movement.ypos)
+        packet.writeShort(movement.xwobble)
+        packet.writeShort(movement.ywobble)
+        packet.write(movement.stance)
+        break
+      case 10:
+        packet.write(movement.unknown1)
+        break
+      case 11:
+        packet.writeShort(movement.xpos)
+        packet.writeShort(movement.ypos)
+        packet.writeShort(movement.flushDelay)
+        packet.write(movement.stance)
+        packet.writeShort(movement.foothold)
+        break
+      case 15:
+        packet.writeShort(movement.xpos)
+        packet.writeShort(movement.ypos)
+        packet.writeShort(movement.xwobble)
+        packet.writeShort(movement.ywobble)
+        packet.writeShort(movement.flushDelay)
+        packet.writeShort(movement.unknown2)
+        packet.write(movement.stance)
+        packet.writeShort(movement.foothold)
+        break
+      default:
+        console.log('Could not encode command', movement)
+    }
+  }
+}
+
+export function broadcastMap(client, packet, self=true) {
+  store.getState().maps[client.server.key][client.character.map].clients.forEach(other => {
+    if (!self && client.character._id === other.character._id)
+      return
+    other.sendPacket(packet).catch(console.log)
+  })
+}
+
+export function removeCharacterFromMap(client) {
+  let packet = new PacketBuilder(0x79)
+  packet.writeInt(client.character.getIntID())
+  broadcastMap(client, packet, false)
+}
+
+export function addCharacterToMap(client) {
+  // // Broadcast the user entering, here i come
+  // store.getMap(client).clients.forEach(other => {
+  //   client.sendPacket(spawnPlayerObject(other.character))
+  // })
+  // store.getMap(client).clients.forEach(other => {
+  //   other.sendPacket(spawnPlayerObject(client.character))
+  // })
+
+  // mongoose.model('Npc').getNpcsOnMap(client.character.map)
+  //   .then(results => {
+  //     return Promise.map(results, npc => {
+  //       return client.sendPacket(npc.createSpawnPacket())
+  //         .then(() => client.sendPacket(npc.createControlPacket()))
+  //     })
+  //   }).catch(console.log)
+  // mongoose.model('Monster').getMonstersOnMap(client.character.map)
+  //   .then(results => {
+  //     return Promise.map(results, monster => {
+  //       return client.sendPacket(monster.createSpawnPacket())
+  //         .then(() => client.sendPacket(monster.createControlPacket()))
+  //     })
+  //   }).catch(console.log)
+}
+
+export function spawnPlayerObject(character) {
+  let packet = new PacketBuilder(0x78)
+  packet.writeInt(character.getIntID())
+  packet.writeString(character.name)
+  // Assuming no guild
+  packet.writeString("")
+  packet.writeArray([0,0,0,0,0,0])
+  packet.writeInt(0)
+  packet.writeInt(1)
+  packet.write(0)
+  packet.writeShort(0)
+  packet.write(0xF8)
+  let buffmask = 0
+  packet.writeInt(0)
+  packet.writeInt(0)
+  let random = Math.floor(Math.random() * 100)
+  packet.writeInt(0)
+  packet.writeShort(0)
+  packet.writeInt(random)
+  packet.writeLong(0)
+  packet.writeShort(0)
+  packet.writeInt(random)
+  packet.writeLong(0)
+  packet.writeShort(0)
+  packet.writeInt(random)
+  packet.writeShort(0)
+  packet.writeLong(0)
+  packet.writeInt(random)
+  packet.writeLong(0)
+  packet.writeInt(random)
+  packet.writeLong(0)
+  packet.writeInt(0)
+  packet.writeShort(0)
+  packet.writeInt(random)
+  packet.writeInt(0)
+  packet.write(0x40)
+  packet.write(1)
+  addCharLook(packet, character)
+  packet.writeInt(0)
+  packet.writeInt(0)
+  packet.writeInt(0)
+  packet.writeShort(character.location.xpos)
+  packet.writeShort(character.location.ypos)
+  packet.write(character.location.stance)
+  packet.writeInt(0)
+  packet.writeInt(1)
+  packet.writeLong(0)
+  packet.write(0)
+  packet.write(0)
+  // Rings
+  packet.writeInt(0)
+  return packet
 }
