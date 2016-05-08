@@ -42,7 +42,7 @@ module.exports = function packet(packetprocessor) {
           let packet = new PacketBuilder(0x0E)
           packet.write(0)
           addCharEntry(packet, char, equips)
-          client.sendPacket(packet)
+          return client.sendPacket(packet)
         })
     }).catch(console.log)
   }
