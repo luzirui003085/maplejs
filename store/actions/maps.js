@@ -29,7 +29,7 @@ export function enterMap(client) {
         map: client.character.map,
         client
       })
-      dispatch(showMapObjects(client)).catch(err => console.log(err.stack))
+      return dispatch(showMapObjects(client)).catch(err => console.log(err.stack))
     }
   }
 }
