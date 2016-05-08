@@ -2,14 +2,14 @@ import store from '../../store'
 import PacketBuilder from '../builder'
 import mongoose from 'mongoose'
 
-export function addCharEntry(packet, char) {
+export function addCharEntry(packet, char, equips=[]) {
   addCharStats(packet, char)
-  addCharLook(packet, char)
+  addCharLook(packet, char, equips)
   packet.write(0)
 }
 
 export function addCharStats(packet, char) {
-  packet.writeInt(char.getIntID())
+  packet.writeInt(char._id)
   packet.writeString(char.name, 13)
   packet.write(char.gender)
   packet.write(char.skinColor)
@@ -38,12 +38,18 @@ export function addCharStats(packet, char) {
   packet.writeInt(0)
 }
 
-function addCharLook(packet, char) {
+function addCharLook(packet, char, equips) {
   packet.write(char.gender)
   packet.write(char.skinColor)
   packet.writeInt(char.face)
   packet.write(0) // mega
   packet.writeInt(char.hair)
+  equips.forEach(equip => {
+    packet.write(equip.position * -1)
+    if (!!equip.item._id)
+      packet.writeInt(equip.item._id)
+    else packet.writeInt(equip.item)
+  })
   packet.write(0xFF) // after visible items
   packet.write(0xFF) // After masked items
   packet.writeInt(0) // No cash weapon
@@ -206,7 +212,7 @@ export function broadcastMap(client, packet, self=true) {
 
 export function removeCharacterFromMap(client) {
   let packet = new PacketBuilder(0x79)
-  packet.writeInt(client.character.getIntID())
+  packet.writeInt(client.character._id)
   broadcastMap(client, packet, false)
 }
 
@@ -237,7 +243,7 @@ export function addCharacterToMap(client) {
 
 export function spawnPlayerObject(character) {
   let packet = new PacketBuilder(0x78)
-  packet.writeInt(character.getIntID())
+  packet.writeInt(character._id)
   packet.writeString(character.name)
   // Assuming no guild
   packet.writeString("")
@@ -272,7 +278,7 @@ export function spawnPlayerObject(character) {
   packet.writeInt(0)
   packet.write(0x40)
   packet.write(1)
-  addCharLook(packet, character)
+  addCharLook(packet, character, character.items.filter(i => i.position < 0))
   packet.writeInt(0)
   packet.writeInt(0)
   packet.writeInt(0)
@@ -286,5 +292,50 @@ export function spawnPlayerObject(character) {
   packet.write(0)
   // Rings
   packet.writeInt(0)
+  return packet
+}
+
+
+export function moveItemPacket(type, src, dst, equipInfo) {
+  let packet = new PacketBuilder(0x1A)
+  packet.writeArray([0x01, 0x01, 0x02])
+  packet.write(type)
+  packet.writeShort(src)
+  packet.writeShort(dst)
+  if (equipInfo !== -1) {
+    packet.write(1)
+  }
+  return packet
+}
+
+export function updateCharLook(character) {
+  let packet = new PacketBuilder(0x98)
+  packet.writeInt(character._id)
+  packet.write(1)
+  addCharLook(packet, character, character.items.filter(i => i.position < 0))
+  packet.writeInt(0)
+  return packet
+}
+
+export function spawnItemDropPacket(item, itemMapId, character) {
+  let packet = new PacketBuilder(0xCD)
+  packet.write(1) // mod
+  packet.writeInt(itemMapId)
+  packet.write(0)
+  packet.writeInt(item.item._id ? item.item._id : item.item)
+  packet.writeInt(0) // owner
+  packet.write(0)
+  packet.writeShort(character.location.x)
+  packet.writeShort(character.location.y)
+  packet.writeInt(0) // owner
+  packet.writeShort(character.location.x)
+  packet.writeShort(character.location.y)
+  packet.write(0)
+  packet.write(0)
+  packet.write(1)
+  packet.writeArray([0x80, 5])
+  packet.writeInt(400967355)
+  packet.write(2)
+  packet.write(1)
   return packet
 }

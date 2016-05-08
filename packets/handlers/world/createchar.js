@@ -32,10 +32,18 @@ module.exports = function packet(packetprocessor) {
       name: name,
       skinColor: skinColor
     }).then(char => {
-      let packet = new PacketBuilder(0x0E)
-      packet.write(0)
-      addCharEntry(packet, char)
-      client.sendPacket(packet)
-    })
+      let promises = []
+      promises.push(mongoose.model('Item').createItem(top, char._id, -5))
+      promises.push(mongoose.model('Item').createItem(bottom, char._id, -6))
+      promises.push(mongoose.model('Item').createItem(shoes, char._id, -7))
+      promises.push(mongoose.model('Item').createItem(weapon, char._id, -11))
+      Promise.all(promises)
+        .then(equips => {
+          let packet = new PacketBuilder(0x0E)
+          packet.write(0)
+          addCharEntry(packet, char, equips)
+          client.sendPacket(packet)
+        })
+    }).catch(console.log)
   }
 }

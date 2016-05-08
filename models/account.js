@@ -1,6 +1,18 @@
 import mongoose, { Schema } from 'mongoose'
 
+let counterSchema = Schema({
+  seq: {
+    type: Number,
+    default: 0
+  }
+})
+const Counter = mongoose.model('AccountCounter', counterSchema)
+
 let accountSchema = Schema({
+  _id: {
+    type: Number,
+    index: true
+  },
   username: {
     type: String,
     unique: true
@@ -13,8 +25,21 @@ let accountSchema = Schema({
   }
 })
 
-accountSchema.methods.getIntID = function getIntID() {
-  return parseInt(this._id.toString().substr(0, 8), 16)
-}
+accountSchema.pre('save', function(next) {
+  if (this._id)
+    next()
+  Counter.findOneAndUpdate({}, {
+    $inc: {
+      seq: 1
+    }
+  }, {
+    new: true,
+    upsert: true,
+    setDefaultsOnInsert: true
+  }).then(res => {
+    this._id = res.seq
+    next()
+  })
+})
 
 export default mongoose.model('Account', accountSchema)

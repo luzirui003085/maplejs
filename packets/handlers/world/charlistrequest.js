@@ -15,11 +15,17 @@ module.exports = function packet(packetprocessor) {
     mongoose.model('Character').find({account: client.account})
       .then(characters => {
         packet.write(characters.length)
-        characters.forEach(char => {
-          addCharEntry(packet, char)
-        })
-        packet.writeInt(3) // max Characters
-        client.sendPacket(packet)
+        return mongoose.model('Item').find()
+          .where('character').in(characters.map(c => c._id))
+          .where('position').lt(0)
+          .select('character position item')
+          .then(items => {
+            characters.forEach(char => {
+              addCharEntry(packet, char, items.filter(item => char._id === item.character))
+            })
+            packet.writeInt(3) // max characters
+            return client.sendPacket(packet)
+          })
       }).catch(err => {
         console.log(err, err.stack)
       })

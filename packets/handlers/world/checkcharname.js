@@ -12,7 +12,7 @@ module.exports = function packet(packetprocessor) {
       }).then(character => {
         packet.writeString(name)
         packet.write(!!character ? 1 : 0)
-        client.sendPacket(packet)
+        return client.sendPacket(packet)
       }).catch(err => {
         console.log(err, err.stack)
       })

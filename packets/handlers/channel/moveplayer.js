@@ -7,7 +7,7 @@ module.exports = function packet(packetprocessor) {
     let movements = parseMovement(reader)
     client.character.location = movements[movements.length - 1]
     let packet = new PacketBuilder(0x8D)
-    packet.writeInt(client.character.getIntID())
+    packet.writeInt(client.character._id)
     packet.writeInt(0)
     encodeMovements(packet, movements)
     broadcastMap(client, packet, false)

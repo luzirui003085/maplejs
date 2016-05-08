@@ -1,9 +1,12 @@
 import mongoose from 'mongoose'
-import { spawnPlayerObject } from '../../packets/handlers/helpers'
+import { spawnPlayerObject, spawnItemDropPacket } from '../../packets/handlers/helpers'
+
+export const NEUTRAL_START_ID = 500
 
 export const ENTER_MAP = 'ENTER_MAP'
 export const LEFT_MAP = 'LEFT_MAP'
 export const INITIALIZE_MAP = 'INITIALIZE_MAP'
+export const ADD_ITEM = 'ADD_ITEM'
 
 export function enterMap(client) {
   return (dispatch, getState) => {
@@ -16,7 +19,9 @@ export function enterMap(client) {
             map: client.character.map,
             client
           })).then(() => dispatch(showMapObjects(client)))
-        .catch(console.log)
+        .catch(err => {
+          console.log(err.stack)
+        })
     } else {
       dispatch({
         type: ENTER_MAP,
@@ -24,7 +29,7 @@ export function enterMap(client) {
         map: client.character.map,
         client
       })
-      dispatch(showMapObjects(client))
+      dispatch(showMapObjects(client)).catch(err => console.log(err.stack))
     }
   }
 }
@@ -32,7 +37,7 @@ export function enterMap(client) {
 function showMapObjects(client) {
   return (dispatch, getState) => {
     let mapData = getState().maps[client.server.key][client.character.map]
-    return Promise.map(mapData.clients, other => {
+    return Promise.map(mapData.clients.filter(o => o !== client), other => {
       return client.sendPacket(spawnPlayerObject(other.character))
         .then(() => other.sendPacket(spawnPlayerObject(client.character)))
     }).then(() => {
@@ -71,12 +76,33 @@ export function leftMap(key, map, client) {
   }
 }
 
+export function addItem(key, map, item) {
+  return {
+    type: ADD_ITEM,
+    key,
+    map,
+    item
+  }
+}
+
+export function dropItem(client, item) {
+  return (dispatch, getState) => {
+    dispatch(addItem(client.server.key, client.character.map, item))
+    let mapData = getState().maps[client.server.key][client.character.map]
+    let itemMapId = mapData.neutrals.map(i => i._id).indexOf(item._id)
+    return Promise.map(mapData.clients, other => {
+      other.sendPacket(spawnItemDropPacket(item, itemMapId, client.character))
+    })
+  }
+}
+
 function getInitialMapData(map) {
   return new Promise((resolve, reject) => {
     let mapData = {
       monsters: [],
       clients: [],
-      npcs: []
+      npcs: [],
+      neutrals: []
     }
     Promise.join(mongoose.model('Monster').getMonstersOnMap(map),
                  mongoose.model('Npc').getNpcsOnMap(map),
@@ -87,9 +113,8 @@ function getInitialMapData(map) {
                   npcs.forEach(npc => {
                     mapData.npcs.push(npc)
                   })
-                  return Promise.resolve(mapData)
+                  resolve(mapData)
                  })
-      .then(resolve)
       .catch(reject)
   })
 }

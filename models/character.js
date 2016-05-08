@@ -1,12 +1,21 @@
 import mongoose, { Schema } from 'mongoose'
 
-let itemSchema = Schema({
+let counterSchema = Schema({
+  seq: {
+    type: Number,
+    default: 0
+  }
 })
+const Counter = mongoose.model('CharacterCounter', counterSchema)
 
 let characterSchema = Schema({
+  _id: {
+    type: Number,
+    index: true
+  },
   world: Number,
   account: {
-    type: Schema.Types.ObjectId,
+    type: Number,
     ref: 'Account'
   },
   name: String,
@@ -85,23 +94,21 @@ let characterSchema = Schema({
   }
 })
 
-characterSchema.methods.getIntID = function getIntID() {
-  return parseInt(this._id.toString().substr(0, 8), 16)
-}
-
-characterSchema.statics.getFromIntID = function getFromIntID(id) {
-  return new Promise((resolve, reject) => {
-    this.find()
-      .then(results => {
-        for (let result of results) {
-          if (result.getIntID() === +id) {
-            resolve(result)
-            break
-          }
-        }
-        resolve(null)
-      }).catch(reject)
+characterSchema.pre('save', function(next) {
+  if (this._id)
+    return next()
+  Counter.findOneAndUpdate({}, {
+    $inc: {
+      seq: 1
+    }
+  }, {
+    new: true,
+    upsert: true,
+    setDefaultsOnInsert: true
+  }).then(res => {
+    this._id = res.seq
+    next()
   })
-}
+})
 
 export default mongoose.model('Character', characterSchema)

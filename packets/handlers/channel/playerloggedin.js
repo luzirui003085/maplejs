@@ -6,8 +6,9 @@ import { enterMap } from '../../../store/actions/maps'
 module.exports = function packet(packetprocessor) {
   packetprocessor[0x14] = function(client, reader, dispatch) {
     let charId = reader.readInt()
-    mongoose.model('Character').getFromIntID(charId)
-      .then(char => {
+    Promise.join(mongoose.model('Character').findOne({_id: charId}),
+                 mongoose.model('Item').find({character: charId}).populate('item'))
+      .spread((char, items) => {
         client.character = char
         client.character.location = {
           xpos: 0,
@@ -31,7 +32,74 @@ module.exports = function packet(packetprocessor) {
         packet.write(100)
         packet.write(100)
         packet.write(100) // slots
+        client.character.equips = items.filter(i => i.position < 0)
+        client.character.items = items
+
+        client.character.equips.sort((a, b) => {
+          return Math.abs(b) - Math.abs(a)
+        }).forEach(item => {
+          let stats = item.item
+          packet.write(item.position * -1)
+          packet.write(1)
+          packet.writeInt(stats._id)
+          packet.writeShort(0)
+          packet.writeArray([0x80, 5])
+          packet.writeInt(400967355)
+          packet.write(2)
+          packet.write(stats.tuc)
+          packet.write(0) // level
+          packet.writeShort(stats.incSTR)
+          packet.writeShort(stats.incDEX)
+          packet.writeShort(stats.incINT)
+          packet.writeShort(stats.incLUK)
+          packet.writeShort(0) // HP
+          packet.writeShort(0) // MP
+          packet.writeShort(0) // WATK
+          packet.writeShort(0) // MATK
+          packet.writeShort(0) // WDEF
+          packet.writeShort(0) // MDEF
+          packet.writeShort(0) // acc
+          packet.writeShort(0) // acoid
+          packet.writeShort(0) // hands
+          packet.writeShort(0) // speed
+          packet.writeShort(0) // jump
+          packet.writeString("") // owner
+          packet.write(0) // locked
+          packet.write(0)
+          packet.writeLong(0)
+        })
         packet.writeShort(0) // start of equip inv
+        client.character.items.filter(i => i.position > 0).forEach(item => {
+          let stats = item.item
+          packet.write(item.position)
+          packet.write(1) // equip not item
+          packet.writeInt(stats._id)
+          packet.writeShort(0)
+          packet.writeArray([0x80, 5])
+          packet.writeInt(400967355)
+          packet.write(2)
+          packet.write(stats.tuc)
+          packet.write(0) // level
+          packet.writeShort(stats.incSTR)
+          packet.writeShort(stats.incDEX)
+          packet.writeShort(stats.incINT)
+          packet.writeShort(stats.incLUK)
+          packet.writeShort(0) // HP
+          packet.writeShort(0) // MP
+          packet.writeShort(0) // WATK
+          packet.writeShort(0) // MATK
+          packet.writeShort(0) // WDEF
+          packet.writeShort(0) // MDEF
+          packet.writeShort(0) // acc
+          packet.writeShort(0) // acoid
+          packet.writeShort(0) // hands
+          packet.writeShort(0) // speed
+          packet.writeShort(0) // jump
+          packet.writeString("") // owner
+          packet.write(0) // locked
+          packet.write(0)
+          packet.writeLong(0)
+        })
         packet.write(0) // start of use inv
         packet.write(0) // start of setup inv
         packet.write(0) // start of etc inv

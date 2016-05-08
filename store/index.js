@@ -5,6 +5,7 @@ import reducers from './reducers'
 function logger({getState}) {
   return next => action => {
     let returnValue = next(action)
+    // console.log('Action', action.type)
     return returnValue
   }
 }

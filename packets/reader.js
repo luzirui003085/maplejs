@@ -6,6 +6,7 @@ export default class PacketReader {
     this.readString = this.readString.bind(this)
     this.readInt = this.readInt.bind(this)
     this.skip = this.skip.bind(this)
+    this.readByte = this.readByte.bind(this)
     this.opCode = this.readShort()
     this.available = this.available.bind(this)
   }
@@ -21,8 +22,7 @@ export default class PacketReader {
   readShort() {
     let byte1 = this.readByte()
     let byte2 = this.readByte()
-    let ret = (byte2 << 8) + byte1
-    return (byte2 << 8) + byte1
+    return ((byte2 << 8) + byte1) << 48 >> 48
   }
 
   readInt() {
