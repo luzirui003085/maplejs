@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
+import { expTable } from '../constants'
 
 let counterSchema = Schema({
   seq: {
@@ -110,5 +111,25 @@ characterSchema.pre('save', function(next) {
     next()
   })
 })
+
+characterSchema.methods.gainExp = function gainExp(exp) {
+  this.exp += process.env.EXP_RATE * exp
+  if (this.exp > expTable[this.level]) {
+    this.levelUp()
+  } else {
+    this.save()
+  }
+}
+
+characterSchema.methods.levelUp = function levelUp() {
+  this.exp %= expTable[this.level]
+  this.level += 1
+  this.ap += 5
+  if (this.level < 10)
+    this.sp += 3
+  this.maxhp += Math.rand(10,20)
+  this.maxmp += Math.rand(10,20)
+  this.maxmp += Math.round(this.int / 10)
+}
 
 export default mongoose.model('Character', characterSchema)

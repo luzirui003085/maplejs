@@ -1,4 +1,6 @@
 import mongoose, { Schema } from 'mongoose'
+import { itemStatSchema } from './itemStats'
+import PacketBuilder from '../packets/builder'
 
 const itemSchema = Schema({
   character: {
@@ -6,10 +8,7 @@ const itemSchema = Schema({
     ref: 'Character'
   },
   storage: Number,
-  item: {
-    type: Number,
-    ref: 'ItemStats'
-  },
+  stats: itemStatSchema,
   inventory: Number,
   position: Number,
   quantity: {
@@ -20,11 +19,19 @@ const itemSchema = Schema({
 })
 
 itemSchema.statics.createItem = function createItem(item, character, position, quantity=1) {
-  return this.create({
-    item,
-    character,
-    position,
-    inventory: parseInt(item / 1000000)
+  return new Promise((resolve, reject) => {
+    mongoose.model('ItemStats').findOne({_id: item}).lean()
+      .then(stats => {
+        return this.create({
+          stats,
+          character,
+          position,
+          inventory: Math.floor(item / 1000000)
+        })
+      }).then(resolve)
+      .catch(reject)
   })
 }
+
+
 export default mongoose.model('Item', itemSchema)

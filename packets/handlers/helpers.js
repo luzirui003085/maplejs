@@ -46,9 +46,7 @@ function addCharLook(packet, char, equips) {
   packet.writeInt(char.hair)
   equips.forEach(equip => {
     packet.write(equip.position * -1)
-    if (!!equip.item._id)
-      packet.writeInt(equip.item._id)
-    else packet.writeInt(equip.item)
+    packet.writeInt(equip.stats._id)
   })
   packet.write(0xFF) // after visible items
   packet.write(0xFF) // After masked items
@@ -278,7 +276,8 @@ export function spawnPlayerObject(character) {
   packet.writeInt(0)
   packet.write(0x40)
   packet.write(1)
-  addCharLook(packet, character, character.items.filter(i => i.position < 0))
+  let equips = [...character.items.values()].filter(i => i.position < 0)
+  addCharLook(packet, character, equips)
   packet.writeInt(0)
   packet.writeInt(0)
   packet.writeInt(0)
@@ -312,30 +311,175 @@ export function updateCharLook(character) {
   let packet = new PacketBuilder(0x98)
   packet.writeInt(character._id)
   packet.write(1)
-  addCharLook(packet, character, character.items.filter(i => i.position < 0))
+  let equips = [...character.items.values()].filter(i => i.position < 0)
+  addCharLook(packet, character, equips)
   packet.writeInt(0)
   return packet
 }
 
-export function spawnItemDropPacket(item, itemMapId, character) {
+export function spawnItemDropPacket(item, itemMapId, pos, mesos=false, owner=0, mod=1, dropper=0) {
   let packet = new PacketBuilder(0xCD)
-  packet.write(1) // mod
+  packet.write(mod) // mod
   packet.writeInt(itemMapId)
+  packet.write(mesos) // mesos = 1, item = 0
+  packet.writeInt(item.stats._id)
+  packet.writeInt(owner) // owner
   packet.write(0)
-  packet.writeInt(item.item._id ? item.item._id : item.item)
-  packet.writeInt(0) // owner
+  packet.writeShort(pos.x)
+  packet.writeShort(pos.y)
+  if (mod != 2) {
+    packet.writeInt(owner)
+    packet.writeShort(pos.x)
+    packet.writeShort(pos.y)
+  } else {
+    packet.writeInt(dropper)
+  }
   packet.write(0)
-  packet.writeShort(character.location.x)
-  packet.writeShort(character.location.y)
-  packet.writeInt(0) // owner
-  packet.writeShort(character.location.x)
-  packet.writeShort(character.location.y)
+  if (mod != 2) {
+    packet.write(0)
+    packet.write(1)
+  }
+  if (!mesos) {
+    packet.writeArray([0x80, 5])
+    packet.writeInt(400967355)
+    packet.write(2)
+    packet.write(1)
+  }
+  return packet
+}
+
+export function addInventoryItem(item, fromDrop=false) {
+  let packet = new PacketBuilder(0x1A)
+  packet.write(fromDrop)
+  packet.writeArray([0x01, 0x00])
+  packet.write(1) // equip = 1, item = 2
+  packet.write(item.position)
+  let stats = item.stats
   packet.write(0)
-  packet.write(0)
-  packet.write(1)
+  packet.write(1) // equip not item
+  packet.writeInt(stats._id)
+  packet.writeShort(0)
   packet.writeArray([0x80, 5])
   packet.writeInt(400967355)
   packet.write(2)
+  packet.write(stats.tuc)
+  packet.write(0) // level
+  packet.writeShort(stats.incSTR)
+  packet.writeShort(stats.incDEX)
+  packet.writeShort(stats.incINT)
+  packet.writeShort(stats.incLUK)
+  packet.writeShort(0) // HP
+  packet.writeShort(0) // MP
+  packet.writeShort(0) // WATK
+  packet.writeShort(0) // MATK
+  packet.writeShort(0) // WDEF
+  packet.writeShort(0) // MDEF
+  packet.writeShort(0) // acc
+  packet.writeShort(0) // acoid
+  packet.writeShort(0) // hands
+  packet.writeShort(0) // speed
+  packet.writeShort(0) // jump
+  packet.writeString("") // owner
+  packet.write(0) // locked
+  packet.write(0)
+  packet.writeLong(0)
+  return packet
+}
+
+export function removeItemFromMap(itemMapId, animation, cid=0) {
+  let packet = new PacketBuilder(0xCE)
+  packet.write(animation)
+  packet.writeInt(itemMapId)
+  if (animation >= 2)
+    packet.writeInt(cid)
+  return packet
+}
+
+export function parseDamage(reader, ranged) {
+  reader.skip(1)
+  let attackByte = reader.readByte()
+  let numAttacked = (attackByte >>> 4) & 0xF
+  let attacksEach = attackByte & 0xF
+  let skill = reader.readInt()
+  let attackInfo = {
+    attackByte,
+    numAttacked,
+    attacksEach,
+    skill
+  }
+  let charge
+  switch(skill) {
+    case 2121001:
+    case 2221001:
+    case 2321001:
+    case 5101004:
+    case 5201002:
+      attackInfo.charge = reader.readInt()
+      break
+    default:
+      attackInfo.charge = 0
+      break
+  }
+  reader.skip(1)
+  attackInfo.stance = reader.readByte()
+  if (attackInfo.skill === 4211006)
+    throw new Error('Meso explosion not implemented yet')
+  if (ranged)
+    throw new Error('Ranged damage not implemented yet')
+  else {
+    reader.skip(1)
+    attackInfo.speed = reader.readByte()
+    reader.skip(4)
+  }
+  attackInfo.attacks = new Map()
+  for (let i = 0; i < attackInfo.numAttacked; i++) {
+    let oid = reader.readInt()
+    reader.skip(14)
+    let numbers = []
+    for (let j = 0; j < attackInfo.attacksEach; j++) {
+      let damage = reader.readInt()
+      if (attackInfo.skill == 3221007)
+        damage += 0x80000000 // crit
+      numbers.push(damage)
+    }
+    if (attackInfo.skill !== 5221004) {
+      reader.skip(4)
+    }
+    attackInfo.attacks.set(oid, numbers)
+  }
+  return attackInfo
+}
+
+export function enableActions() {
+  let packet = new PacketBuilder(0x1C)
   packet.write(1)
+  packet.writeInt(0)
+  return packet
+}
+
+
+export function addAttackBody(packet, charId, attackInfo, projectile) {
+  packet.writeInt(charId)
+  packet.write(attackInfo.attackByte)
+  if (attackInfo.skill > 0) {
+    packet.write(0xFF)
+    packet.writeInt(attackInfo.skill)
+  } else {
+    packet.write(0)
+  }
+  packet.write(0)
+  packet.write(attackInfo.stance)
+  packet.write(attackInfo.speed)
+  packet.write(0x0A)
+  packet.writeInt(projectile)
+  for (var [oid, damages] of attackInfo.attacks) {
+    if (damages.length > 0) {
+      packet.writeInt(oid)
+      packet.write(0xFF)
+      damages.forEach(damage => {
+        packet.writeInt(damage)
+      })
+    }
+  }
   return packet
 }

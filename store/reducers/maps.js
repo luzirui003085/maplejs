@@ -1,4 +1,5 @@
-import { INITIALIZE_MAP, ENTER_MAP, LEFT_MAP, ADD_ITEM } from '../actions/maps'
+import { INITIALIZE_MAP, ENTER_MAP, LEFT_MAP, ADD_ITEM, REMOVE_ITEM,
+REMOVE_MONSTER } from '../actions/maps'
 import { NUM_WORLDS, NUM_CHANNELS } from '../../config'
 
 let initialState = {}
@@ -26,7 +27,23 @@ export default function maps(state=initialState, action) {
         [action.key]: subState
       })
     case ADD_ITEM:
-      subState[action.map].neutrals = [...subState[action.map].neutrals, action.item]
+      let neutrals = subState[action.map].neutrals
+      for (var i = 0; i < 100000; i++) {
+        if (!neutrals.has(i)) {
+          neutrals.set(i, action.item)
+          break
+        }
+      }
+      return Object.assign({}, state, {
+        [action.key]: subState
+      })
+    case REMOVE_ITEM:
+      subState[action.map].neutrals.delete(action.itemMapId)
+      return Object.assign({}, state, {
+        [action.key]: subState
+      })
+    case REMOVE_MONSTER:
+      subState[action.map].monsters = subState[action.map].monsters.filter(m => m.id !== action.monsterId)
       return Object.assign({}, state, {
         [action.key]: subState
       })

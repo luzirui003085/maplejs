@@ -32,13 +32,15 @@ module.exports = function packet(packetprocessor) {
         packet.write(100)
         packet.write(100)
         packet.write(100) // slots
-        client.character.equips = items.filter(i => i.position < 0)
-        client.character.items = items
-
-        client.character.equips.sort((a, b) => {
+        client.character.items = new Map()
+        items.forEach(item => {
+          client.character.items.set(item.position, item)
+        })
+        let equips = [...client.character.items.values()].filter(i => i.position < 0)
+        equips.sort((a, b) => {
           return Math.abs(b) - Math.abs(a)
         }).forEach(item => {
-          let stats = item.item
+          let stats = item.stats
           packet.write(item.position * -1)
           packet.write(1)
           packet.writeInt(stats._id)
@@ -54,7 +56,7 @@ module.exports = function packet(packetprocessor) {
           packet.writeShort(stats.incLUK)
           packet.writeShort(0) // HP
           packet.writeShort(0) // MP
-          packet.writeShort(0) // WATK
+          packet.writeShort(stats.incPAD) // WATK
           packet.writeShort(0) // MATK
           packet.writeShort(0) // WDEF
           packet.writeShort(0) // MDEF
@@ -69,8 +71,9 @@ module.exports = function packet(packetprocessor) {
           packet.writeLong(0)
         })
         packet.writeShort(0) // start of equip inv
-        client.character.items.filter(i => i.position > 0).forEach(item => {
-          let stats = item.item
+        let equipInventory = [...client.character.items.values()].filter(i => i.position > 0)
+        equipInventory.forEach(item => {
+          let stats = item.stats
           packet.write(item.position)
           packet.write(1) // equip not item
           packet.writeInt(stats._id)

@@ -84,7 +84,7 @@ describe('Model testing', () => {
   it('Should create an item', done => {
     mongoose.model('Item').createItem(1302000, 1, -11)
       .then(item => {
-        expect(item.item).to.equal(1302000)
+        expect(item.stats._id).to.equal(1302000)
         expect(item.position).to.equal(-11)
         expect(item.character).to.equal(1)
         done()
@@ -106,10 +106,21 @@ describe('Model testing', () => {
       .then(items => {
         expect(items.length).to.equal(3)
         items.forEach(item => {
-          expect(item.item.tuc).to.equal(7)
-          expect(item.item.reqJob).to.equal(0)
-          expect(item.item.price).to.equal(1)
+          expect(item.stats.tuc).to.equal(7)
+          expect(item.stats.reqJob).to.equal(0)
+          expect(item.stats.price).to.equal(1)
         })
+        done()
+      }).catch(done)
+  })
+
+  it('Should get monsters from map and kill it', done => {
+    mongoose.model('Monster').getMonstersOnMap(104040000)
+      .then(monsters => {
+        let mob = monsters[0]
+        expect(mob.currentHP).to.equal(mob.stats.maxHP)
+        mob.takeDamage(mob.stats.maxHP)
+        expect(mob.currentHP).to.equal(0)
         done()
       }).catch(done)
   })

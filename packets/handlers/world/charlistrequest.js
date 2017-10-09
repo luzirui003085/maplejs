@@ -18,7 +18,7 @@ module.exports = function packet(packetprocessor) {
         return mongoose.model('Item').find()
           .where('character').in(characters.map(c => c._id))
           .where('position').lt(0)
-          .select('character position item')
+          .select('character position stats')
           .then(items => {
             characters.forEach(char => {
               addCharEntry(packet, char, items.filter(item => char._id === item.character))
